@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape/discovery/openstack"
+
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/envtemplate"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promauth"
@@ -69,6 +71,7 @@ type ScrapeConfig struct {
 	StaticConfigs        []StaticConfig              `yaml:"static_configs"`
 	FileSDConfigs        []FileSDConfig              `yaml:"file_sd_configs"`
 	KubernetesSDConfigs  []kubernetes.SDConfig       `yaml:"kubernetes_sd_configs"`
+	OpenStackSDConfigs   []openstack.SDConfig        `yaml:"openstack_sd_configs"`
 	ConsulSDConfigs      []consul.SDConfig           `yaml:"consul_sd_configs"`
 	DNSSDConfigs         []dns.SDConfig              `yaml:"dns_sd_configs"`
 	EC2SDConfigs         []ec2.SDConfig              `yaml:"ec2_sd_configs"`
@@ -185,6 +188,34 @@ func (cfg *Config) getKubernetesSDScrapeWork(prev []ScrapeWork) []ScrapeWork {
 			sdc := &sc.KubernetesSDConfigs[j]
 			var okLocal bool
 			dst, okLocal = appendKubernetesScrapeWork(dst, sdc, cfg.baseDir, sc.swc)
+			if ok {
+				ok = okLocal
+			}
+		}
+		if ok {
+			continue
+		}
+		swsPrev := swsPrevByJob[sc.swc.jobName]
+		if len(swsPrev) > 0 {
+			logger.Errorf("there were errors when discovering kubernetes targets for job %q, so preserving the previous targets", sc.swc.jobName)
+			dst = append(dst[:dstLen], swsPrev...)
+		}
+	}
+	return dst
+}
+
+// getKubernetesSDScrapeWork returns `kubernetes_sd_configs` ScrapeWork from cfg.
+func (cfg *Config) getOpenStackSDScrapeWork(prev []ScrapeWork) []ScrapeWork {
+	swsPrevByJob := getSWSByJob(prev)
+	var dst []ScrapeWork
+	for i := range cfg.ScrapeConfigs {
+		sc := &cfg.ScrapeConfigs[i]
+		dstLen := len(dst)
+		ok := true
+		for j := range sc.OpenStackSDConfigs {
+			sdc := &sc.OpenStackSDConfigs[j]
+			var okLocal bool
+			dst, okLocal = appendOpenstackScrapeWork(dst, sdc, cfg.baseDir, sc.swc)
 			if ok {
 				ok = okLocal
 			}
@@ -437,6 +468,15 @@ type scrapeWorkConfig struct {
 
 func appendKubernetesScrapeWork(dst []ScrapeWork, sdc *kubernetes.SDConfig, baseDir string, swc *scrapeWorkConfig) ([]ScrapeWork, bool) {
 	targetLabels, err := kubernetes.GetLabels(sdc, baseDir)
+	if err != nil {
+		logger.Errorf("error when discovering kubernetes targets for `job_name` %q: %s; skipping it", swc.jobName, err)
+		return dst, false
+	}
+	return appendScrapeWorkForTargetLabels(dst, swc, targetLabels, "kubernetes_sd_config"), true
+}
+
+func appendOpenstackScrapeWork(dst []ScrapeWork, sdc *openstack.SDConfig, baseDir string, swc *scrapeWorkConfig) ([]ScrapeWork, bool) {
+	targetLabels, err := openstack.GetLabels(sdc)
 	if err != nil {
 		logger.Errorf("error when discovering kubernetes targets for `job_name` %q: %s; skipping it", swc.jobName, err)
 		return dst, false
