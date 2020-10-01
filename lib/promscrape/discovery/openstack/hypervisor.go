@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"strconv"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape/discoveryutils"
@@ -85,7 +86,7 @@ func hypervisorAPIResponse(href string, cfg *apiConfig) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot create new request for openstach hvs discovery: %w", err)
 	}
-	req.Header.Set(authHearName, token)
+	req.Header.Set(authHearName, token.token)
 	resp, err := cfg.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed query openstack api for hypervisor details: %w", err)
@@ -95,7 +96,7 @@ func hypervisorAPIResponse(href string, cfg *apiConfig) ([]byte, error) {
 }
 
 func parseHypervisorDetail(data []byte) (*hypervisorDetail, error) {
-	hvsd := hypervisorDetail{}
+	var hvsd hypervisorDetail
 	if err := json.Unmarshal(data, &hvsd); err != nil {
 		return nil, err
 	}
@@ -103,7 +104,9 @@ func parseHypervisorDetail(data []byte) (*hypervisorDetail, error) {
 }
 
 func (cfg *apiConfig) getHypervisors() ([]hypervisor, error) {
-	nextLink := cfg.novaEndpoint + "/os-hypervisors/detail"
+	novaURL := *cfg.creds.computeURL
+	novaURL.Path = path.Join(novaURL.Path, "os-hypervisors", "detail")
+	nextLink := novaURL.String()
 	var hvs []hypervisor
 	for {
 		resp, err := hypervisorAPIResponse(nextLink, cfg)
@@ -124,24 +127,6 @@ func (cfg *apiConfig) getHypervisors() ([]hypervisor, error) {
 		return hvs, nil
 	}
 }
-
-/*
-	addr := net.JoinHostPort(hypervisor.HostIP, fmt.Sprintf("%d", h.port))
-	labels[model.AddressLabel] = model.LabelValue(addr)
-	labels[openstackLabelHypervisorID] = model.LabelValue(hypervisor.ID)
-	labels[openstackLabelHypervisorHostName] = model.LabelValue(hypervisor.HypervisorHostname)
-	labels[openstackLabelHypervisorHostIP] = model.LabelValue(hypervisor.HostIP)
-	labels[openstackLabelHypervisorStatus] = model.LabelValue(hypervisor.Status)
-	labels[openstackLabelHypervisorState] = model.LabelValue(hypervisor.State)
-	labels[openstackLabelHypervisorType] = model.LabelValue(hypervisor.HypervisorType)
-	openstackLabelHypervisorID       = openstackLabelPrefix + "hypervisor_id"
-	openstackLabelHypervisorHostIP   = openstackLabelPrefix + "hypervisor_host_ip"
-	openstackLabelHypervisorHostName = openstackLabelPrefix + "hypervisor_hostname"
-	openstackLabelHypervisorStatus   = openstackLabelPrefix + "hypervisor_status"
-	openstackLabelHypervisorState    = openstackLabelPrefix + "hypervisor_state"
-	openstackLabelHypervisorType     = openstackLabelPrefix + "hypervisor_type"
-
-*/
 
 func addHypervisorLabels(ms []map[string]string, hvs []hypervisor, port int) []map[string]string {
 	for _, hv := range hvs {

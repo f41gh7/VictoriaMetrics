@@ -213,7 +213,6 @@ func (cfg *Config) getOpenStackSDScrapeWork(prev []ScrapeWork) []ScrapeWork {
 		dstLen := len(dst)
 		ok := true
 		for j := range sc.OpenStackSDConfigs {
-			logger.Infof("added openstack")
 			sdc := &sc.OpenStackSDConfigs[j]
 			var okLocal bool
 			dst, okLocal = appendOpenstackScrapeWork(dst, sdc, cfg.baseDir, sc.swc)
@@ -477,7 +476,7 @@ func appendKubernetesScrapeWork(dst []ScrapeWork, sdc *kubernetes.SDConfig, base
 }
 
 func appendOpenstackScrapeWork(dst []ScrapeWork, sdc *openstack.SDConfig, baseDir string, swc *scrapeWorkConfig) ([]ScrapeWork, bool) {
-	targetLabels, err := openstack.GetLabels(sdc)
+	targetLabels, err := openstack.GetLabels(sdc, baseDir)
 	if err != nil {
 		logger.Errorf("error when discovering kubernetes targets for `job_name` %q: %s; skipping it", swc.jobName, err)
 		return dst, false

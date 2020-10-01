@@ -2,8 +2,8 @@ package openstack
 
 import (
 	"encoding/json"
+	"path"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape/discoveryutils"
 )
 
@@ -25,28 +25,29 @@ type instance struct {
 	// such as IN_PROGRESS or ACTIVE.
 	Status string `json:"status"`
 
-	// AccessIPv4 and AccessIPv6 contain the IP addresses of the server,
-	// suitable for remote access for administration.
-	AccessIPv4 string `json:"accessIPv4"`
-	AccessIPv6 string `json:"accessIPv6"`
-	Addresses  map[string][]struct {
+	Addresses map[string][]struct {
 		Address string `json:"addr"`
 		Version int    `json:"version"`
 		Type    string `json:"OS-EXT-IPS:type"`
 	} `json:"addresses"`
-	HostId     string            `json:"host_id"`
-	HostStatus string            `json:"host_status"`
-	Metadata   map[string]string `json:"metadata"`
-	Flavor     struct {
+
+	Metadata map[string]string `json:"metadata"`
+	Flavor   struct {
 		ID string `json:"id"`
 	} `json:"flavor"`
 }
 
 func (cfg *apiConfig) getServers() ([]instance, error) {
-	nextLink := cfg.novaEndpoint + "/servers/detail"
+	novaURL := *cfg.creds.computeURL
+	novaURL.Path = path.Join(novaURL.Path, "servers", "detail")
 	if !cfg.allTenants {
-		nextLink += "?all_tenants=false"
+		q := novaURL.Query()
+		q.Set("all_tenants", "false")
+		novaURL.RawQuery = q.Encode()
 	}
+
+	nextLink := novaURL.String()
+
 	var servers []instance
 	for {
 		resp, err := hypervisorAPIResponse(nextLink, cfg)
@@ -54,15 +55,14 @@ func (cfg *apiConfig) getServers() ([]instance, error) {
 			return nil, err
 		}
 
-		logger.Infof("get resp %s", string(resp))
-		detail, err := parseServersDetail(resp)
+		serversDetail, err := parseServersDetail(resp)
 		if err != nil {
 			return nil, err
 		}
-		servers = append(servers, detail.Servers...)
+		servers = append(servers, serversDetail.Servers...)
 
-		if len(detail.Links) > 0 {
-			nextLink = detail.Links[0].HREF
+		if len(serversDetail.Links) > 0 {
+			nextLink = serversDetail.Links[0].HREF
 			continue
 		}
 		return servers, nil
@@ -70,22 +70,21 @@ func (cfg *apiConfig) getServers() ([]instance, error) {
 }
 
 type serversDetail struct {
-	Servers []instance
+	Servers []instance `json:"servers"`
 	Links   []struct {
-		HREF string
-		Rel  string
-	}
+		HREF string `json:"href"`
+		Rel  string `json:"rel"`
+	} `json:"servers_links"`
 }
 
 func parseServersDetail(data []byte) (*serversDetail, error) {
-	srvd := serversDetail{}
+	var srvd serversDetail
 	if err := json.Unmarshal(data, &srvd); err != nil {
 		return nil, err
 	}
 	return &srvd, nil
 }
 
-//
 func getInstancesLabels(cfg *apiConfig) ([]map[string]string, error) {
 	srv, err := cfg.getServers()
 	if err != nil {
@@ -98,18 +97,6 @@ func getInstancesLabels(cfg *apiConfig) ([]map[string]string, error) {
 
 func addInstanceLabels(ms []map[string]string, servers []instance, port int) []map[string]string {
 	for _, server := range servers {
-		/*
-			openstackLabelInstanceFlavor = openstackLabelPrefix + "instance_flavor"
-			openstackLabelInstanceID     = openstackLabelPrefix + "instance_id"
-			openstackLabelInstanceName   = openstackLabelPrefix + "instance_name"
-			openstackLabelInstanceStatus = openstackLabelPrefix + "instance_status"
-			openstackLabelPrivateIP      = openstackLabelPrefix + "private_ip"
-			openstackLabelProjectID      = openstackLabelPrefix + "project_id"
-			openstackLabelPublicIP       = openstackLabelPrefix + "public_ip"
-			openstackLabelTagPrefix      = openstackLabelPrefix + "tag_"
-			openstackLabelUserID         = openstackLabelPrefix + "user_id"
-
-		*/
 		m := map[string]string{
 			"__meta_openstack_instance_id":     server.ID,
 			"__meta_openstack_instance_status": server.Status,
@@ -141,6 +128,7 @@ func addInstanceLabels(ms []map[string]string, servers []instance, port int) []m
 				if len(ip.Address) == 0 || ip.Type == "floating" {
 					continue
 				}
+				// copy labels
 				lbls := make(map[string]string, len(m))
 				for k, v := range m {
 					lbls[k] = v

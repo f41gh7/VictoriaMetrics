@@ -30,8 +30,8 @@ type SDConfig struct {
 }
 
 // GetLabels returns gce labels according to sdc.
-func GetLabels(sdc *SDConfig) ([]map[string]string, error) {
-	cfg, err := getAPIConfig(sdc)
+func GetLabels(sdc *SDConfig, baseDir string) ([]map[string]string, error) {
+	cfg, err := getAPIConfig(sdc, baseDir)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get API config: %w", err)
 	}
