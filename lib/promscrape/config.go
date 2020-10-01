@@ -213,6 +213,7 @@ func (cfg *Config) getOpenStackSDScrapeWork(prev []ScrapeWork) []ScrapeWork {
 		dstLen := len(dst)
 		ok := true
 		for j := range sc.OpenStackSDConfigs {
+			logger.Infof("added openstack")
 			sdc := &sc.OpenStackSDConfigs[j]
 			var okLocal bool
 			dst, okLocal = appendOpenstackScrapeWork(dst, sdc, cfg.baseDir, sc.swc)
