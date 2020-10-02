@@ -3,7 +3,6 @@ package openstack
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"path"
 	"strconv"
 
@@ -63,6 +62,15 @@ import (
 
 */
 
+// https://docs.openstack.org/api-ref/compute/?expanded=list-servers-detailed-detail#list-hypervisors-details
+type hypervisorDetail struct {
+	Hypervisors []hypervisor `json:"hypervisors"`
+	Links       []struct {
+		HREF string `json:"href"`
+		Rel  string `json:"rel"`
+	} `json:"hypervisors_links"`
+}
+
 type hypervisor struct {
 	HostIP   string `json:"host_ip"`
 	ID       int    `json:"id"`
@@ -72,34 +80,12 @@ type hypervisor struct {
 	Type     string `json:"hypervisor_type"`
 }
 
-type hypervisorDetail struct {
-	Hypervisors []hypervisor `json:"hypervisors"`
-	Links       []struct {
-		HREF string `json:"href"`
-		Rel  string `json:"rel"`
-	} `json:"hypervisors_links"`
-}
-
-func hypervisorAPIResponse(href string, cfg *apiConfig) ([]byte, error) {
-	token, err := cfg.getFreshAPICredentials()
-	req, err := http.NewRequest("GET", href, nil)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create new request for openstach hvs discovery: %w", err)
-	}
-	req.Header.Set(authHearName, token.token)
-	resp, err := cfg.client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed query openstack api for hypervisor details: %w", err)
-	}
-	return readResponseBody(resp, href)
-
-}
-
 func parseHypervisorDetail(data []byte) (*hypervisorDetail, error) {
 	var hvsd hypervisorDetail
 	if err := json.Unmarshal(data, &hvsd); err != nil {
 		return nil, err
 	}
+
 	return &hvsd, nil
 }
 
@@ -109,7 +95,7 @@ func (cfg *apiConfig) getHypervisors() ([]hypervisor, error) {
 	nextLink := novaURL.String()
 	var hvs []hypervisor
 	for {
-		resp, err := hypervisorAPIResponse(nextLink, cfg)
+		resp, err := getAPIResponse(nextLink, cfg)
 		if err != nil {
 			return nil, err
 		}
@@ -124,6 +110,7 @@ func (cfg *apiConfig) getHypervisors() ([]hypervisor, error) {
 			nextLink = detail.Links[0].HREF
 			continue
 		}
+
 		return hvs, nil
 	}
 }
@@ -141,8 +128,8 @@ func addHypervisorLabels(ms []map[string]string, hvs []hypervisor, port int) []m
 			"__meta_openstack_hypervisor_id":       strconv.Itoa(hv.ID),
 		}
 		ms = append(ms, m)
-
 	}
+
 	return ms
 }
 
@@ -152,6 +139,7 @@ func getHypervisorLabels(cfg *apiConfig) ([]map[string]string, error) {
 		return nil, fmt.Errorf("cannot get hypervisors: %w", err)
 	}
 	var ms []map[string]string
+
 	return addHypervisorLabels(ms, hvs, cfg.port), nil
 
 }

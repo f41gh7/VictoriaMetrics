@@ -2,7 +2,6 @@ package openstack
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promauth"
 )
@@ -22,7 +21,6 @@ type SDConfig struct {
 	ApplicationCredentialSecret string              `yaml:"application_credential_secret"`
 	Role                        string              `yaml:"role"`
 	Region                      string              `yaml:"region"`
-	RefreshInterval             time.Duration       `yaml:"refresh_interval"`
 	Port                        int                 `yaml:"port"`
 	AllTenants                  bool                `yaml:"all_tenants,omitempty"`
 	TLSConfig                   *promauth.TLSConfig `yaml:"tls_config"`
@@ -43,5 +41,4 @@ func GetLabels(sdc *SDConfig, baseDir string) ([]map[string]string, error) {
 	default:
 		return nil, fmt.Errorf("unexpected `role`: %q; must be one of `node`, `service`, `pod`, `endpoints` or `ingress`; skipping it", sdc.Role)
 	}
-
 }
