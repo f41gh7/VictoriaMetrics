@@ -147,7 +147,6 @@ func Test_addHypervisorLabels(t *testing.T) {
 			if !reflect.DeepEqual(sortedLabelss, tt.want) {
 				t.Errorf("addHypervisorLabels() = %v, want %v", sortedLabelss, tt.want)
 			}
-
 		})
 	}
 }

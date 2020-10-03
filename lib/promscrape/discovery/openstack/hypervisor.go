@@ -88,5 +88,4 @@ func getHypervisorLabels(cfg *apiConfig) ([]map[string]string, error) {
 	}
 
 	return addHypervisorLabels(hvs, cfg.port), nil
-
 }

@@ -150,7 +150,6 @@ func Test_addInstanceLabels(t *testing.T) {
 			if !reflect.DeepEqual(sortedLabelss, tt.want) {
 				t.Errorf("addInstanceLabels() = \n got: %v,\nwant: %v", sortedLabelss, tt.want)
 			}
-
 		})
 	}
 }

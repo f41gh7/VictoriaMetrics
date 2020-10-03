@@ -155,7 +155,7 @@ func getCreds(cfg *apiConfig) (*apiCredentials, error) {
 
 	computeURL, err := getComputeEndpointURL(ar.Token.Catalog, cfg.availability, cfg.region)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get novaEndpoint, account doesn't have enough permissions,"+
+		return nil, fmt.Errorf("cannot get computeEndpoint, account doesn't have enough permissions,"+
 			" availability: %s, region: %s", cfg.availability, cfg.region)
 	}
 
@@ -166,7 +166,7 @@ func getCreds(cfg *apiConfig) (*apiCredentials, error) {
 	}, nil
 }
 
-// readResponseBody - reads body from http.Response
+// readResponseBody - reads body from http.Response.
 func readResponseBody(resp *http.Response, apiURL string) ([]byte, error) {
 	data, err := ioutil.ReadAll(resp.Body)
 	_ = resp.Body.Close()

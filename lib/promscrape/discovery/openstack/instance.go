@@ -126,6 +126,7 @@ func (cfg *apiConfig) getServers() ([]server, error) {
 			nextLink = serversDetail.Links[0].HREF
 			continue
 		}
+
 		return servers, nil
 	}
 }

@@ -44,7 +44,7 @@ func getComputeEndpointURL(catalog []catalogItem, availability, region string) (
 	return nil, fmt.Errorf("cannot excract compute url from catalog, availability: %s, region: %s ", availability, region)
 }
 
-// buildAuthRequestBody - builds request for authentication
+// buildAuthRequestBody - builds request for authentication.
 func buildAuthRequestBody(sdc *SDConfig) ([]byte, error) {
 
 	// fast path
