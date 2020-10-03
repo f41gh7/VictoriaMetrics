@@ -256,7 +256,7 @@ func buildAuthRequestBody(sdc *SDConfig) ([]byte, error) {
 func buildScope(sdc *SDConfig) (map[string]interface{}, error) {
 
 	// fast path
-	if len(sdc.ProjectName) == 0 || len(sdc.ProjectID) == 0 || len(sdc.DomainID) == 0 || len(sdc.DomainName) == 0 {
+	if len(sdc.ProjectName) == 0 && len(sdc.ProjectID) == 0 && len(sdc.DomainID) == 0 && len(sdc.DomainName) == 0 {
 		return nil, nil
 	}
 

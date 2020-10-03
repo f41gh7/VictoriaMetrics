@@ -94,10 +94,12 @@ func newAPIConfig(sdc *SDConfig, baseDir string) (*apiConfig, error) {
 		}
 		cfg.client.Transport = tr
 	}
+	// use public compute endpoint by default
 	if len(cfg.availability) == 0 {
 		cfg.availability = "public"
 	}
 
+	// special case if identity_endpoint is not defined
 	if len(sdc.IdentityEndpoint) == 0 {
 		// override sdc
 		sdc = readCredentialsFromEnv()
@@ -105,7 +107,7 @@ func newAPIConfig(sdc *SDConfig, baseDir string) (*apiConfig, error) {
 
 	parsedURL, err := url.Parse(sdc.IdentityEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot parse identity_endpoint: %s as url, err: %w", sdc.IdentityEndpoint, err)
 	}
 	cfg.endpoint = parsedURL
 	tokenReq, err := buildAuthRequestBody(sdc)
@@ -122,7 +124,7 @@ func newAPIConfig(sdc *SDConfig, baseDir string) (*apiConfig, error) {
 	return cfg, nil
 }
 
-// getCreds - make call to openstack keystone api and retrives token and computeURL
+// getCreds - make call to openstack keystone api and retrieves token and computeURL
 // https://docs.openstack.org/api-ref/identity/v3/
 func getCreds(cfg *apiConfig) (*apiCredentials, error) {
 
@@ -182,14 +184,17 @@ func readResponseBody(resp *http.Response, apiURL string) ([]byte, error) {
 // getAPIResponse - makes api call to openstack and returns response body
 func getAPIResponse(href string, cfg *apiConfig) ([]byte, error) {
 	token, err := cfg.getFreshAPICredentials()
+	if err != nil {
+		return nil, fmt.Errorf("failed refresh api credentials: %w", err)
+	}
 	req, err := http.NewRequest("GET", href, nil)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create new request for openstach hvs discovery: %w", err)
+		return nil, fmt.Errorf("cannot create new request for openstach api href: %s, err: %w", href, err)
 	}
 	req.Header.Set(authHearName, token.token)
 	resp, err := cfg.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed query openstack api for hypervisor details: %w", err)
+		return nil, fmt.Errorf("failed query openstack api, href: %s, err : %w", href, err)
 	}
 
 	return readResponseBody(resp, href)

@@ -9,66 +9,13 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape/discoveryutils"
 )
 
-/*
-{
-    "hypervisors": [
-        {
-            "cpu_info": {
-                "arch": "x86_64",
-                "model": "Nehalem",
-                "vendor": "Intel",
-                "features": [
-                    "pge",
-                    "clflush"
-                ],
-                "topology": {
-                    "cores": 1,
-                    "threads": 1,
-                    "sockets": 4
-                }
-            },
-            "current_workload": 0,
-            "status": "enabled",
-            "state": "up",
-            "disk_available_least": 0,
-            "host_ip": "1.1.1.1",
-            "free_disk_gb": 1028,
-            "free_ram_mb": 7680,
-            "hypervisor_hostname": "host1",
-            "hypervisor_type": "fake",
-            "hypervisor_version": 1000,
-            "id": 2,
-            "local_gb": 1028,
-            "local_gb_used": 0,
-            "memory_mb": 8192,
-            "memory_mb_used": 512,
-            "running_vms": 0,
-            "service": {
-                "host": "host1",
-                "id": 6,
-                "disabled_reason": null
-            },
-            "vcpus": 2,
-            "vcpus_used": 0
-        }
-    ],
-    "hypervisors_links": [
-        {
-            "href": "http://openstack.example.com/v2.1/6f70656e737461636b20342065766572/os-hypervisors/detail?limit=1&marker=2",
-            "rel": "next"
-        }
-    ]
-}
-
-*/
-
 // https://docs.openstack.org/api-ref/compute/?expanded=list-servers-detailed-detail#list-hypervisors-details
 type hypervisorDetail struct {
 	Hypervisors []hypervisor `json:"hypervisors"`
 	Links       []struct {
 		HREF string `json:"href"`
-		Rel  string `json:"rel"`
-	} `json:"hypervisors_links"`
+		Rel  string `json:"rel,omitempty"`
+	} `json:"hypervisors_links,omitempty"`
 }
 
 type hypervisor struct {
@@ -83,16 +30,16 @@ type hypervisor struct {
 func parseHypervisorDetail(data []byte) (*hypervisorDetail, error) {
 	var hvsd hypervisorDetail
 	if err := json.Unmarshal(data, &hvsd); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot parse hypervisorDetail: %w", err)
 	}
 
 	return &hvsd, nil
 }
 
 func (cfg *apiConfig) getHypervisors() ([]hypervisor, error) {
-	novaURL := *cfg.creds.computeURL
-	novaURL.Path = path.Join(novaURL.Path, "os-hypervisors", "detail")
-	nextLink := novaURL.String()
+	computeURL := *cfg.creds.computeURL
+	computeURL.Path = path.Join(computeURL.Path, "os-hypervisors", "detail")
+	nextLink := computeURL.String()
 	var hvs []hypervisor
 	for {
 		resp, err := getAPIResponse(nextLink, cfg)
@@ -115,7 +62,8 @@ func (cfg *apiConfig) getHypervisors() ([]hypervisor, error) {
 	}
 }
 
-func addHypervisorLabels(ms []map[string]string, hvs []hypervisor, port int) []map[string]string {
+func addHypervisorLabels(hvs []hypervisor, port int) []map[string]string {
+	var ms []map[string]string
 	for _, hv := range hvs {
 		addr := discoveryutils.JoinHostPort(hv.HostIP, port)
 		m := map[string]string{
@@ -138,8 +86,7 @@ func getHypervisorLabels(cfg *apiConfig) ([]map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get hypervisors: %w", err)
 	}
-	var ms []map[string]string
 
-	return addHypervisorLabels(ms, hvs, cfg.port), nil
+	return addHypervisorLabels(hvs, cfg.port), nil
 
 }

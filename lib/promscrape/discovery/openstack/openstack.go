@@ -39,6 +39,6 @@ func GetLabels(sdc *SDConfig, baseDir string) ([]map[string]string, error) {
 	case "instance":
 		return getInstancesLabels(cfg)
 	default:
-		return nil, fmt.Errorf("unexpected `role`: %q; must be one of `node`, `service`, `pod`, `endpoints` or `ingress`; skipping it", sdc.Role)
+		return nil, fmt.Errorf("unexpected `role`: %q; must be one of `instance` or `hypervisor`; skipping it", sdc.Role)
 	}
 }

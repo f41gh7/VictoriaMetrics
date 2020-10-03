@@ -2,12 +2,22 @@ package openstack
 
 import (
 	"encoding/json"
+	"fmt"
 	"path"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/promscrape/discoveryutils"
 )
 
-type instance struct {
+// https://docs.openstack.org/api-ref/compute/?expanded=list-servers-detailed-detail#list-servers
+type serversDetail struct {
+	Servers []server `json:"servers"`
+	Links   []struct {
+		HREF string `json:"href"`
+		Rel  string `json:"rel"`
+	} `json:"servers_links,omitempty"`
+}
+
+type server struct {
 	ID        string `json:"id"`
 	TenantID  string `json:"tenant_id"`
 	UserID    string `json:"user_id"`
@@ -19,30 +29,23 @@ type instance struct {
 		Version int    `json:"version"`
 		Type    string `json:"OS-EXT-IPS:type"`
 	} `json:"addresses"`
-	Metadata map[string]string `json:"metadata"`
+	Metadata map[string]string `json:"metadata,omitempty"`
 	Flavor   struct {
 		ID string `json:"id"`
 	} `json:"flavor"`
 }
 
-// https://docs.openstack.org/api-ref/compute/?expanded=list-servers-detailed-detail#list-servers
-type serversDetail struct {
-	Servers []instance `json:"servers"`
-	Links   []struct {
-		HREF string `json:"href"`
-		Rel  string `json:"rel"`
-	} `json:"servers_links"`
-}
-
 func parseServersDetail(data []byte) (*serversDetail, error) {
 	var srvd serversDetail
 	if err := json.Unmarshal(data, &srvd); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot parse serversDetail: %w", err)
 	}
+
 	return &srvd, nil
 }
 
-func addInstanceLabels(ms []map[string]string, servers []instance, port int) []map[string]string {
+func addInstanceLabels(servers []server, port int) []map[string]string {
+	var ms []map[string]string
 	for _, server := range servers {
 		m := map[string]string{
 			"__meta_openstack_instance_id":     server.ID,
@@ -94,18 +97,19 @@ func addInstanceLabels(ms []map[string]string, servers []instance, port int) []m
 	return ms
 }
 
-func (cfg *apiConfig) getServers() ([]instance, error) {
-	novaURL := *cfg.creds.computeURL
-	novaURL.Path = path.Join(novaURL.Path, "servers", "detail")
+func (cfg *apiConfig) getServers() ([]server, error) {
+	computeURL := *cfg.creds.computeURL
+	computeURL.Path = path.Join(computeURL.Path, "servers", "detail")
+	// by default, query fetches data from all tenants
 	if !cfg.allTenants {
-		q := novaURL.Query()
+		q := computeURL.Query()
 		q.Set("all_tenants", "false")
-		novaURL.RawQuery = q.Encode()
+		computeURL.RawQuery = q.Encode()
 	}
 
-	nextLink := novaURL.String()
+	nextLink := computeURL.String()
 
-	var servers []instance
+	var servers []server
 	for {
 		resp, err := getAPIResponse(nextLink, cfg)
 		if err != nil {
@@ -131,7 +135,6 @@ func getInstancesLabels(cfg *apiConfig) ([]map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var ms []map[string]string
-	ms = addInstanceLabels(ms, srv, cfg.port)
-	return ms, nil
+	return addInstanceLabels(srv, cfg.port), nil
+
 }
