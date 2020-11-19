@@ -13,6 +13,7 @@ var configMap = discoveryutils.NewConfigMap()
 
 type apiConfig struct {
 	client *discoveryutils.Client
+	port   int
 }
 
 func newAPIConfig(sdc *SDConfig, baseDir string) (*apiConfig, error) {
@@ -25,7 +26,7 @@ func newAPIConfig(sdc *SDConfig, baseDir string) (*apiConfig, error) {
 	}
 	port := 80
 	if sdc.Port == nil {
-		sdc.Port = &port
+		port = *sdc.Port
 	}
 	if len(sdc.Username) > 0 {
 		ba = &promauth.BasicAuthConfig{
@@ -55,6 +56,7 @@ func newAPIConfig(sdc *SDConfig, baseDir string) (*apiConfig, error) {
 	}
 	cfg := &apiConfig{
 		client: client,
+		port:   port,
 	}
 	return cfg, nil
 }

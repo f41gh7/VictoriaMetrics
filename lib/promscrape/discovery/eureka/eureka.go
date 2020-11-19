@@ -93,7 +93,7 @@ func GetLabels(sdc *SDConfig, baseDir string) ([]map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return addInstanceLabels(apps, *sdc.Port), nil
+	return addInstanceLabels(apps, cfg.port), nil
 }
 
 func addInstanceLabels(applications *applications, port int) []map[string]string {
